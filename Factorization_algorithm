@@ -1,0 +1,99 @@
+import math
+from egcd import egcd
+
+
+def Baby_step(f, N):
+    a = math.floor(((abs(f[1]))//2 + math.sqrt(N))/abs(f[2]))
+    P = a*abs(f[2]) - (abs(f[1]))//2
+    Q = (N - P**2)//(abs(f[2]))
+    
+    return (abs(f[2]), 2*P, Q)
+
+
+# Gauss composition of f and f.
+def Gauss_composition_square(f, N):
+    d = math.gcd(f[0],f[1])
+    ext_eucl = egcd(f[0], f[1])
+    d0 = math.gcd(d, f[2])
+
+    return ((d0*f[0]**2)//(d**2), f[1]-(2*f[0]*f[2]*ext_eucl[2])//d, ((f[1]-2*f[0]*f[2]*ext_eucl[2]//d)**2 - 4*N)//(4*((d0*f[0]**2)//(d**2))))
+
+
+# Gauss composition of f and g.
+def Gauss_composition(f, g, N):
+    s = (f[1] + g[1])//2
+    n = (f[1] - g[1])//2
+    d = math.gcd(f[0], g[0], s)
+    ext_eucl_1 = egcd(f[0], g[0])
+    ext_eucl_2 = egcd(ext_eucl_1[0], s)
+    v = ext_eucl_1[2]*ext_eucl_2[1]
+    w = ext_eucl_2[2]
+    d0 = math.gcd(d, f[2], g[2], n)
+
+    return ((d0*f[0]*g[0])//(d**2), g[1]+((2*g[0])*(v*(s-g[1])-w*g[2]))//d, ((g[1]+((2*g[0])*(v*(s-g[1])-w*g[2]))//d)**2 - 4*N)//(4*((d0*f[0]*g[0])//(d**2))))
+
+
+# Reduction operator.
+def Rho(f, N):
+    r = (-f[1]) % (2*abs(f[2]))
+    if abs(f[2])>math.sqrt(4*N):
+        while r>abs(f[2]):
+            r = r-abs(2*f[2])
+    else :
+        while r>math.sqrt(4*N):
+            r = r-abs(2*f[2])
+        while r<math.sqrt(4*N)-2*abs(f[2]):
+            r = r+abs(2*f[2])
+
+    return (f[2], r, (r**2-4*N)//(4*f[2]))
+
+
+# Factorization algorithm
+# Input: 
+# - N the integer to be factorized (positive, square free and such that the period of the continued fraction expansion of sqrt(N) is even)
+# - R the regulator of Q(sqrt(N))
+# Output:
+# - a factor of N
+def Factorization(N, R):
+    a0 = math.floor(math.sqrt(N))
+    g0 = (1, 2*a0, a0**2-N)
+    d0 = math.log(abs((a0 + math.sqrt(N))/(a0 - math.sqrt(N))))/2
+    upper_d0 = 2*math.log(4*N)+1
+    sign = 1
+
+    while d0 < upper_d0:
+        sign = -sign
+        g0 = Baby_step(g0, N) 
+        g0 = ((sign)*g0[0], g0[1], (-sign)*g0[2])
+        d0 = d0 + math.log(abs((g0[1] + math.sqrt(4*N))/(g0[1] - math.sqrt(4*N))))/2
+
+    F = ((g0, d0),)
+    t = 1   
+    d_app = d0
+    qf = (g0[0], g0[1], g0[2])
+
+    while d_app < R/2:
+        qf = Gauss_composition_square(qf, N)
+        d_app = 2*d_app
+
+        while qf[1]<abs(math.sqrt(4*N) - 2*abs(qf[0])) or qf[1]>math.sqrt(4*N):
+            d_app = d_app + math.log(abs((qf[1] + math.sqrt(4*N))/(qf[1] - math.sqrt(4*N))))/2
+            qf = Rho(qf, N)
+
+        F = F + ((qf, d_app),)
+        t = t+1 
+
+    d_bar = F[t-2][1]
+    f_bar = (F[t-2][0][0], F[t-2][0][1], F[t-2][0][2])
+
+    for j in reversed(range(t-2)):
+        if (d_bar + F[j][1]) < R/2:
+            d_bar = d_bar + F[j][1]
+            f_bar = Gauss_composition(f_bar, F[j][0], N)
+            while f_bar[1]<abs(math.sqrt(4*N) - 2*abs(f_bar[0])) or f_bar[1]>math.sqrt(4*N):
+                f_bar = Rho(f_bar, N)
+
+    while abs(N % (f_bar[2]))>0 or abs(f_bar[2])==1:
+        f_bar = Rho(f_bar, N)
+
+    return math.gcd(N, f_bar[2])
